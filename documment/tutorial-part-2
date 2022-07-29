@@ -1,0 +1,955 @@
+In the previous tutorial article, we have completed controller and routes. In this tutorial, we will continue with creating blade views.
+Step 9: Create blade view files
+
+Now in this is step, we are going to create a blade view files. We will use one common layout and extend it to all views. Here is the list of all views that we will create in resources/views/ directory. You can go to all folder and copy each view to your local file.
+layouts/
+    app.blade.php
+users/
+    index.blade.php
+    show.blade.php
+    create.blade.php
+    edit.blade.php
+roles/
+    index.blade.php
+    show.blade.php
+    create.blade.php
+    edit.blade.php
+permissions/
+    index.blade.php
+    show.blade.php
+    create.blade.php
+    edit.blade.php
+posts/
+    index.blade.php
+    show.blade.php
+    create.blade.php
+    edit.blade.php
+
+Let's start from common layout file. It is already there, you just slightly need to change in it and add route link in navigation bar.
+
+resources/views/layouts/app.blade.php
+
+<!doctype html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{{ config('app.name', 'Laravel') }}</title>
+    <script src="{{ asset('js/app.js') }}" defer></script>
+    <link rel="dns-prefetch" href="//fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet">
+    <link href="{{ asset('css/app.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <nav class="navbar navbar-expand-md navbar-light bg-white shadow-sm">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url('/') }}">
+                    {{ config('app.name', 'Laravel') }}
+                </a>
+                <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="{{ __('Toggle navigation') }}">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                    <ul class="navbar-nav mr-auto"></ul>
+                    <ul class="navbar-nav ml-auto">
+                        @guest
+                            @if (Route::has('login'))
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{{ route('login') }}">{{ __('Login') }}</a>
+                                </li>
+                            @endif
+                            @if (Route::has('register'))
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{{ route('register') }}">{{ __('Register') }}</a>
+                                </li>
+                            @endif
+                        @else
+                            @can('user-list')
+                                <li><a class="nav-link" href="{{ route('users.index') }}">Users</a></li>
+                            @endcan
+                            @can('role-list')
+                                <li><a class="nav-link" href="{{ route('roles.index') }}">Roles</a></li>
+                            @endcan
+                            @can('permission-list')
+                                <li><a class="nav-link" href="{{ route('permissions.index') }}">Permission</a></li>
+                            @endcan
+                            @can('post-list')
+                                <li><a class="nav-link" href="{{ route('posts.index') }}">Posts</a></li>
+                            @endcan
+                            <li class="nav-item dropdown">
+                                <a id="navbarDropdown" class="nav-link dropdown-toggle" href="#" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" v-pre>
+                                    {{ Auth::user()->name }}
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdown">
+                                    <a class="dropdown-item" href="{{ route('logout') }}"
+                                       onclick="event.preventDefault();
+                                                     document.getElementById('logout-form').submit();">
+                                        {{ __('Logout') }}
+                                    </a>
+                                    <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
+                                        @csrf
+                                    </form>
+                                </div>
+                            </li>
+                        @endguest
+                    </ul>
+                </div>
+            </div>
+        </nav>
+        <main class="py-4">
+            @yield('content')
+        </main>
+    </div>
+</body>
+</html>
+
+Below blade files are view template for all module CRUD.
+
+resources/views/users/index.blade.php
+
+@extends('layouts.app')
+@section('content')
+<div class="container">
+    <div class="justify-content-center">
+        @if (\Session::has('success'))
+            <div class="alert alert-success">
+                <p>{{ \Session::get('success') }}</p>
+            </div>
+        @endif
+        <div class="card">
+            <div class="card-header">Users
+                <span class="float-right">
+                    <a class="btn btn-primary" href="{{ route('users.create') }}">New User</a>
+                </span>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Roles</th>
+                            <th width="280px">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($data as $key => $user)
+                            <tr>
+                                <td>{{ $user->id }}</td>
+                                <td>{{ $user->name }}</td>
+                                <td>{{ $user->email }}</td>
+                                <td>
+                                    @if(!empty($user->getRoleNames()))
+                                        @foreach($user->getRoleNames() as $val)
+                                            <label class="badge badge-dark">{{ $val }}</label>
+                                        @endforeach
+                                    @endif
+                                </td>
+                                <td>
+                                    <a class="btn btn-success" href="{{ route('users.show',$user->id) }}">Show</a>
+                                    @can('user-edit')
+                                        <a class="btn btn-primary" href="{{ route('users.edit',$user->id) }}">Edit</a>
+                                    @endcan
+                                    @can('user-delete')
+                                        {!! Form::open(['method' => 'DELETE','route' => ['users.destroy', $user->id],'style'=>'display:inline']) !!}
+                                        {!! Form::submit('Delete', ['class' => 'btn btn-danger']) !!}
+                                        {!! Form::close() !!}
+                                    @endcan
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+                {{ $data->render() }}
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+resources/views/users/show.blade.php
+
+@extends('layouts.app')
+@section('content')
+<div class="container">
+    <div class="justify-content-center">
+        @if (\Session::has('success'))
+            <div class="alert alert-success">
+                <p>{{ \Session::get('success') }}</p>
+            </div>
+        @endif
+        <div class="card">
+            <div class="card-header">User
+                @can('role-create')
+                    <span class="float-right">
+                        <a class="btn btn-primary" href="{{ route('users.index') }}">Back</a>
+                    </span>
+                @endcan
+            </div>
+            <div class="card-body">
+                <div class="lead">
+                    <strong>Name:</strong>
+                    {{ $user->name }}
+                </div>
+                <div class="lead">
+                    <strong>Email:</strong>
+                    {{ $user->email }}
+                </div>
+                <div class="lead">
+                    <strong>Password:</strong>
+                    ********
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+resources/views/users/create.blade.php
+
+@extends('layouts.app')
+@section('content')
+<div class="container">
+    <div class="justify-content-center">
+        @if (count($errors) > 0)
+            <div class="alert alert-danger">
+                <strong>Opps!</strong> Something went wrong, please check below errors.<br><br>
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+        <div class="card">
+            <div class="card-header">Create user
+                <span class="float-right">
+                    <a class="btn btn-primary" href="{{ route('users.index') }}">Users</a>
+                </span>
+            </div>
+
+            <div class="card-body">
+                {!! Form::open(array('route' => 'users.store','method'=>'POST')) !!}
+                    <div class="form-group">
+                        <strong>Name:</strong>
+                        {!! Form::text('name', null, array('placeholder' => 'Name','class' => 'form-control')) !!}
+                    </div>
+                    <div class="form-group">
+                        <strong>Email:</strong>
+                        {!! Form::text('email', null, array('placeholder' => 'Email','class' => 'form-control')) !!}
+                    </div>
+                    <div class="form-group">
+                        <strong>Password:</strong>
+                        {!! Form::password('password', array('placeholder' => 'Password','class' => 'form-control')) !!}
+                    </div>
+                    <div class="form-group">
+                        <strong>Confirm Password:</strong>
+                        {!! Form::password('password_confirmation', array('placeholder' => 'Confirm Password','class' => 'form-control')) !!}
+                    </div>
+                    <div class="form-group">
+                        <strong>Role:</strong>
+                        {!! Form::select('roles[]', $roles,[], array('class' => 'form-control','multiple')) !!}
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                {!! Form::close() !!}
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+resources/views/users/edit.blade.php
+
+@extends('layouts.app')
+@section('content')
+<div class="container">
+    <div class="justify-content-center">
+        @if (count($errors) > 0)
+            <div class="alert alert-danger">
+                <strong>Opps!</strong> Something went wrong, please check below errors.<br><br>
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+        <div class="card">
+            <div class="card-header">Create user
+                <span class="float-right">
+                    <a class="btn btn-primary" href="{{ route('users.index') }}">Users</a>
+                </span>
+            </div>
+
+            <div class="card-body">
+                {!! Form::model($user, ['route' => ['users.update', $user->id], 'method'=>'PATCH']) !!}
+                    <div class="form-group">
+                        <strong>Name:</strong>
+                        {!! Form::text('name', null, array('placeholder' => 'Name','class' => 'form-control')) !!}
+                    </div>
+                    <div class="form-group">
+                        <strong>Email:</strong>
+                        {!! Form::text('email', null, array('placeholder' => 'Email','class' => 'form-control')) !!}
+                    </div>
+                    <div class="form-group">
+                        <strong>Password:</strong>
+                        {!! Form::password('password', array('placeholder' => 'Password','class' => 'form-control')) !!}
+                    </div>
+                    <div class="form-group">
+                        <strong>Confirm Password:</strong>
+                        {!! Form::password('password_confirmation', array('placeholder' => 'Confirm Password','class' => 'form-control')) !!}
+                    </div>
+                    <div class="form-group">
+                        <strong>Role:</strong>
+                        {!! Form::select('roles[]', $roles, $userRole, array('class' => 'form-control','multiple')) !!}
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                {!! Form::close() !!}
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+resources/views/roles/index.blade.php
+
+@extends('layouts.app')
+@section('content')
+<div class="container">
+    <div class="justify-content-center">
+        @if (\Session::has('success'))
+            <div class="alert alert-success">
+                <p>{{ \Session::get('success') }}</p>
+            </div>
+        @endif
+        <div class="card">
+            <div class="card-header">Roles
+                @can('role-create')
+                    <span class="float-right">
+                        <a class="btn btn-primary" href="{{ route('roles.create') }}">New Role</a>
+                    </span>
+                @endcan
+            </div>
+            <div class="card-body">
+                <table class="table table-hover">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th width="280px">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($data as $key => $role)
+                            <tr>
+                                <td>{{ $role->id }}</td>
+                                <td>{{ $role->name }}</td>
+                                <td>
+                                    <a class="btn btn-success" href="{{ route('roles.show',$role->id) }}">Show</a>
+                                    @can('role-edit')
+                                        <a class="btn btn-primary" href="{{ route('roles.edit',$role->id) }}">Edit</a>
+                                    @endcan
+                                    @can('role-delete')
+                                        {!! Form::open(['method' => 'DELETE','route' => ['roles.destroy', $role->id],'style'=>'display:inline']) !!}
+                                        {!! Form::submit('Delete', ['class' => 'btn btn-danger']) !!}
+                                        {!! Form::close() !!}
+                                    @endcan
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+                {{ $data->render() }}
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+resources/views/roles/show.blade.php
+
+@extends('layouts.app')
+@section('content')
+<div class="container">
+    <div class="justify-content-center">
+        @if (\Session::has('success'))
+            <div class="alert alert-success">
+                <p>{{ \Session::get('success') }}</p>
+            </div>
+        @endif
+        <div class="card">
+            <div class="card-header">Role
+                @can('role-create')
+                    <span class="float-right">
+                        <a class="btn btn-primary" href="{{ route('roles.index') }}">Back</a>
+                    </span>
+                @endcan
+            </div>
+            <div class="card-body">
+                <div class="lead">
+                    <strong>Name:</strong>
+                    {{ $role->name }}
+                </div>
+                <div class="lead">
+                    <strong>Permissions:</strong>
+                    @if(!empty($rolePermissions))
+                        @foreach($rolePermissions as $permission)
+                            <label class="badge badge-success">{{ $permission->name }}</label>
+                        @endforeach
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+resources/views/roles/create.blade.php
+
+@extends('layouts.app')
+@section('content')
+<div class="container">
+    <div class="justify-content-center">
+        @if (count($errors) > 0)
+            <div class="alert alert-danger">
+                <strong>Opps!</strong> Something went wrong, please check below errors.<br><br>
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+        <div class="card">
+            <div class="card-header">Create role
+                <span class="float-right">
+                    <a class="btn btn-primary" href="{{ route('roles.index') }}">Roles</a>
+                </span>
+            </div>
+            <div class="card-body">
+                {!! Form::open(array('route' => 'roles.store','method'=>'POST')) !!}
+                    <div class="form-group">
+                        <strong>Name:</strong>
+                        {!! Form::text('name', null, array('placeholder' => 'Name','class' => 'form-control')) !!}
+                    </div>
+                    <div class="form-group">
+                        <strong>Permission:</strong>
+                        <br/>
+                        @foreach($permission as $value)
+                            <label>{{ Form::checkbox('permission[]', $value->id, false, array('class' => 'name')) }}
+                            {{ $value->name }}</label>
+                        <br/>
+                        @endforeach
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                {!! Form::close() !!}
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+resources/views/roles/edit.blade.php
+
+@extends('layouts.app')
+@section('content')
+<div class="container">
+    <div class="justify-content-center">
+        @if (count($errors) > 0)
+            <div class="alert alert-danger">
+                <strong>Opps!</strong> Something went wrong, please check below errors.<br><br>
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+        <div class="card">
+            <div class="card-header">Edit role
+                <span class="float-right">
+                    <a class="btn btn-primary" href="{{ route('roles.index') }}">Roles</a>
+                </span>
+            </div>
+            <div class="card-body">
+                {!! Form::model($role, ['route' => ['roles.update', $role->id],'method' => 'PATCH']) !!}
+                    <div class="form-group">
+                        <strong>Name:</strong>
+                        {!! Form::text('name', null, array('placeholder' => 'Name','class' => 'form-control')) !!}
+                    </div>
+                    <div class="form-group">
+                        <strong>Permission:</strong>
+                        <br/>
+                        @foreach($permission as $value)
+                            <label>{{ Form::checkbox('permission[]', $value->id, in_array($value->id, $rolePermissions) ? true : false, array('class' => 'name')) }}
+                            {{ $value->name }}</label>
+                        <br/>
+                        @endforeach
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                {!! Form::close() !!}
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+resources/views/permissions/index.blade.php
+
+@extends('layouts.app')
+@section('content')
+<div class="container">
+    <div class="justify-content-center">
+        @if (\Session::has('success'))
+            <div class="alert alert-success">
+                <p>{{ \Session::get('success') }}</p>
+            </div>
+        @endif
+        <div class="card">
+            <div class="card-header">Permissions
+                @can('role-create')
+                    <span class="float-right">
+                        <a class="btn btn-primary" href="{{ route('permissions.create') }}">New Permission</a>
+                    </span>
+                @endcan
+            </div>
+            <div class="card-body">
+                <table class="table table-hover">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th width="280px">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($data as $key => $permission)
+                            <tr>
+                                <td>{{ $permission->id }}</td>
+                                <td>{{ $permission->name }}</td>
+                                <td>
+                                    <a class="btn btn-success" href="{{ route('permissions.show',$permission->id) }}">Show</a>
+                                    @can('role-edit')
+                                        <a class="btn btn-primary" href="{{ route('permissions.edit',$permission->id) }}">Edit</a>
+                                    @endcan
+                                    @can('role-delete')
+                                        {!! Form::open(['method' => 'DELETE','route' => ['permissions.destroy', $permission->id],'style'=>'display:inline']) !!}
+                                        {!! Form::submit('Delete', ['class' => 'btn btn-danger']) !!}
+                                        {!! Form::close() !!}
+                                    @endcan
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+                {{ $data->appends($_GET)->links() }}
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+resources/views/permissions/show.blade.php
+
+@extends('layouts.app')
+@section('content')
+<div class="container">
+    <div class="justify-content-center">
+        @if (\Session::has('success'))
+            <div class="alert alert-success">
+                <p>{{ \Session::get('success') }}</p>
+            </div>
+        @endif
+        <div class="card">
+            <div class="card-header">Permission
+                @can('role-create')
+                    <span class="float-right">
+                        <a class="btn btn-primary" href="{{ route('permissions.index') }}">Back</a>
+                    </span>
+                @endcan
+            </div>
+            <div class="card-body">
+                <div class="lead">
+                    <strong>Name:</strong>
+                    {{ $permission->name }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+resources/views/permissions/create.blade.php
+
+@extends('layouts.app')
+@section('content')
+<div class="container">
+    <div class="justify-content-center">
+        @if (count($errors) > 0)
+            <div class="alert alert-danger">
+                <strong>Opps!</strong> Something went wrong, please check below errors.<br><br>
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+        <div class="card">
+            <div class="card-header">Create permission
+                <span class="float-right">
+                    <a class="btn btn-primary" href="{{ route('permissions.index') }}">Permissions</a>
+                </span>
+            </div>
+            <div class="card-body">
+                {!! Form::open(array('route' => 'permissions.store','method'=>'POST')) !!}
+                    <div class="form-group">
+                        <strong>Name:</strong>
+                        {!! Form::text('name', null, array('placeholder' => 'Name','class' => 'form-control')) !!}
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                {!! Form::close() !!}
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+resources/views/permissions/edit.blade.php
+
+@extends('layouts.app')
+@section('content')
+<div class="container">
+    <div class="justify-content-center">
+        @if (count($errors) > 0)
+            <div class="alert alert-danger">
+                <strong>Opps!</strong> Something went wrong, please check below errors.<br><br>
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+        <div class="card">
+            <div class="card-header">Edit permission
+                <span class="float-right">
+                    <a class="btn btn-primary" href="{{ route('permissions.index') }}">Permissions</a>
+                </span>
+            </div>
+            <div class="card-body">
+                {!! Form::model($permission, ['route' => ['permissions.update', $permission->id], 'method'=>'PATCH']) !!}
+                    <div class="form-group">
+                        <strong>Name:</strong>
+                        {!! Form::text('name', null, array('placeholder' => 'Name','class' => 'form-control')) !!}
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                {!! Form::close() !!}
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+resources/views/posts/index.blade.php
+
+@extends('layouts.app')
+@section('content')
+<div class="container">
+    <div class="justify-content-center">
+        @if (\Session::has('success'))
+            <div class="alert alert-success">
+                <p>{{ \Session::get('success') }}</p>
+            </div>
+        @endif
+        <div class="card">
+            <div class="card-header">Posts
+                @can('role-create')
+                    <span class="float-right">
+                        <a class="btn btn-primary" href="{{ route('posts.create') }}">New post</a>
+                    </span>
+                @endcan
+            </div>
+            <div class="card-body">
+                <table class="table table-hover">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th width="280px">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($data as $key => $post)
+                            <tr>
+                                <td>{{ $post->id }}</td>
+                                <td>{{ $post->title }}</td>
+                                <td>
+                                    <a class="btn btn-success" href="{{ route('posts.show',$post->id) }}">Show</a>
+                                    @can('post-edit')
+                                        <a class="btn btn-primary" href="{{ route('posts.edit',$post->id) }}">Edit</a>
+                                    @endcan
+                                    @can('post-delete')
+                                        {!! Form::open(['method' => 'DELETE','route' => ['posts.destroy', $post->id],'style'=>'display:inline']) !!}
+                                        {!! Form::submit('Delete', ['class' => 'btn btn-danger']) !!}
+                                        {!! Form::close() !!}
+                                    @endcan
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+                {{ $data->appends($_GET)->links() }}
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+resources/views/posts/show.blade.php
+
+@extends('layouts.app')
+@section('content')
+<div class="container">
+    <div class="justify-content-center">
+        @if (\Session::has('success'))
+            <div class="alert alert-success">
+                <p>{{ \Session::get('success') }}</p>
+            </div>
+        @endif
+        <div class="card">
+            <div class="card-header">Post
+                @can('role-create')
+                    <span class="float-right">
+                        <a class="btn btn-primary" href="{{ route('posts.index') }}">Back</a>
+                    </span>
+                @endcan
+            </div>
+            <div class="card-body">
+                <div class="lead">
+                    <strong>Title:</strong>
+                    {{ $post->title }}
+                </div>
+                <div class="lead">
+                    <strong>Body:</strong>
+                    {{ $post->body }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+resources/views/posts/create.blade.php
+
+@extends('layouts.app')
+@section('content')
+<div class="container">
+    <div class="justify-content-center">
+        @if (count($errors) > 0)
+            <div class="alert alert-danger">
+                <strong>Opps!</strong> Something went wrong, please check below errors.<br><br>
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+        <div class="card">
+            <div class="card-header">Create post
+                <span class="float-right">
+                    <a class="btn btn-primary" href="{{ route('posts.index') }}">Posts</a>
+                </span>
+            </div>
+            <div class="card-body">
+                {!! Form::open(array('route' => 'posts.store', 'method'=>'POST')) !!}
+                    <div class="form-group">
+                        <strong>Title:</strong>
+                        {!! Form::text('title', null, array('placeholder' => 'Title','class' => 'form-control')) !!}
+                    </div>
+                    <div class="form-group">
+                        <strong>Body:</strong>
+                        {!! Form::textarea('body', null, array('placeholder' => 'Body','class' => 'form-control')) !!}
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                {!! Form::close() !!}
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+resources/views/posts/edit.blade.php
+
+@extends('layouts.app')
+@section('content')
+<div class="container">
+    <div class="justify-content-center">
+        @if (count($errors) > 0)
+            <div class="alert alert-danger">
+                <strong>Opps!</strong> Something went wrong, please check below errors.<br><br>
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+        <div class="card">
+            <div class="card-header">Create post
+                <span class="float-right">
+                    <a class="btn btn-primary" href="{{ route('posts.index') }}">Posts</a>
+                </span>
+            </div>
+            <div class="card-body">
+                {!! Form::model($post, ['route' => ['posts.update', $post->id], 'method'=>'PATCH']) !!}
+                    <div class="form-group">
+                        <strong>Title:</strong>
+                        {!! Form::text('title', null, array('placeholder' => 'Title','class' => 'form-control')) !!}
+                    </div>
+                    <div class="form-group">
+                        <strong>Body:</strong>
+                        {!! Form::textarea('body', null, array('placeholder' => 'Body','class' => 'form-control')) !!}
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                {!! Form::close() !!}
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+Step 10: Create required permissions and roles
+
+We will need few basic permissions and role when we start project. We will use seeder to create permission. So, create seeder class using below command:
+
+php artisan make:seeder PermissionTableSeeder
+
+This will create a seeder in database/migrations folder. Open and add the below code in it.
+
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use Spatie\Permission\Models\Permission;
+
+class PermissionTableSeeder extends Seeder
+{
+    /**
+     * Run the database seeds.
+     *
+     * @return void
+     */
+    public function run()
+    {
+        $data = [
+            'user-list',
+            'user-create',
+            'user-edit',
+            'user-delete',
+            'role-list',
+            'role-create',
+            'role-edit',
+            'role-delete',
+            'permission-list',
+            'permission-create',
+            'permission-edit',
+            'permission-delete',
+            'post-list',
+            'post-create',
+            'post-edit',
+            'post-delete',
+
+        ];
+
+        foreach ($data as $permission) {
+             Permission::create(['name' => $permission]);
+        }
+    }
+}
+
+We will also need a role which has above permissions with all these permissions. So now create a seeder for role.
+
+php artisan make:seeder RoleTableSeeder
+
+database/seeders/RoleTableSeeder.php
+
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use Spatie\Permission\Models\Role;
+
+class RoleTableSeeder extends Seeder
+{
+    /**
+     * Run the database seeds.
+     *
+     * @return void
+     */
+    public function run()
+    {
+        Role::create(['name' => 'admin']);
+    }
+}
+
+And a user which has this role. Create a user seeder with below command.
+
+php artisan make:seeder UserTableSeeder
+
+database/seeders/UserTableSeeder.php
+
+<?php
+
+namespace Database\Seeders;
+
+use Hash;
+use App\Models\User;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
+use Illuminate\Database\Seeder;
+
+class UserTableSeeder extends Seeder
+{
+    /**
+     * Run the database seeds.
+     *
+     * @return void
+     */
+    public function run()
+    {
+        $user = User::create([
+            'name' => 'Jitesh Meniya',
+            'email' => 'jiteshmeniya99@gmail.com',
+            'password' => Hash::make('12345678')
+        ]);
+
+        $role = Role::find(1);
+
+        $permissions = Permission::pluck('id', 'id')->all();
+
+        $role->syncPermissions($permissions);
+
+        $user->assignRole([$role->id]);
+    }
+}
+
+Now run these seeds one by one using following commands:
+
+php artisan db:seed --class=PermissionTableSeeder
+php artisan db:seed --class=RoleTableSeeder
+php artisan db:seed --class=UserTableSeeder
+
+Now everything is ready from coding side. We need to run Laravel server with following artisan command.
+
+php artisan serve
+
+In your browser open the url http://localhost:8000/login and login with the admin user that we have created. You can also download code from Github repository.
+
+If you liked the article, please like our Facebook page and follow us on Twitter. We are also on Reddit at https://www.reddit.com/user/HackTheStuff/ and Linked in at https://www.linkedin.com/company/28709327/admin/

@@ -1,0 +1,769 @@
+We will implement post CRUD with appropriate permission to roles users. We will go through from the scratch step by step so it would be easy for you to implement. So let's start with fresh Laravel application.
+Step 1: Create Laravel application
+
+In the initial step, we need to create fresh application. So open your Terminal or Command Prompt and create a new Laravel application. After the installation completed, open the project in text editor.
+
+composer create-project laravel/laravel post
+
+ANd change Terminal's working directory to project
+
+cd post
+
+Step 2: Install and configure packages
+
+After the Laravel application created, we are going to install Spatie package. Run the following command:
+
+composer require spatie/laravel-permission
+
+We are also going to use Laravel collective form. So in the same Terminal project root directory, hit the command:
+
+composer require laravelcollective/html
+
+Now we need to register provider class to config/app.php file so open file and add service provider.
+
+'providers' => [
+    Spatie\Permission\PermissionServiceProvider::class,
+];
+
+If you want to change in the package, then you can fire bellow command and it will create a config file in config/permission.php and migration files. We will run migrate command in the next step.
+
+php artisan vendor:publish --provider="Spatie\Permission\PermissionServiceProvider"
+
+Step 3: Create posts table
+
+We are using post module for roles, so use below command to create posts migration.
+
+php artisan make:migration create_posts_table
+
+This will create a new migration at database/migrations folder. Open the file and add below lines in up() method.
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+class CreatePostsTable extends Migration
+{
+    /**
+     * Run the migrations.
+     *
+     * @return void
+     */
+    public function up()
+    {
+        Schema::create('posts', function (Blueprint $table) {
+            $table->id();
+            $table->string('title');
+            $table->text('body');
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     *
+     * @return void
+     */
+    public function down()
+    {
+        Schema::dropIfExists('posts');
+    }
+}
+
+We will also need to configure database before running migration. Open .env file from project folder and change database configuration.
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=post
+DB_USERNAME=root
+DB_PASSWORD=root
+
+Now run the migrate command.
+
+php artisan migrate
+
+Step 4: Create post model
+
+In this step, we we will create a post model to get data for posts table. Run the below artisan command to generate Post model.
+
+php artisan make:model Post
+
+And add fillable attribute in Post model.
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Post extends Model
+{
+    use HasFactory;
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array
+     */
+    protected $fillable = [
+        'title',
+        'body',
+    ];
+}
+
+User model is already included in Laravel. We just need to add HasRoles trait in it. So open User model and add it.
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Spatie\Permission\Traits\HasRoles;
+
+class User extends Authenticatable
+{
+    use HasFactory, HasRoles, Notifiable;
+}
+
+
+Step 4: Register package middlewares
+
+The package has comes with roles and permission middlewares, we can add them inside app/Http/Kernel.php file.
+
+protected $routeMiddleware = [
+    'role' => \Spatie\Permission\Middlewares\RoleMiddleware::class,
+    'permission' => \Spatie\Permission\Middlewares\PermissionMiddleware::class,
+    'role_or_permission' => \Spatie\Permission\Middlewares\RoleOrPermissionMiddleware::class,
+]
+
+Step 6: Create authentication scaffold
+
+We have configured the package, now we need to implement Laravel default authentication feature. So run the following command in Terminal.
+
+composer require laravel/ui
+
+We also need views for login and register. You can do it with following command.
+
+php artisan ui bootstrap --auth
+
+Now we also need to compile view assets for authentication view. So run the below npm command.
+
+Note: The below npm commands only require for asset compiling, if you are adding your own view, then you don't need to run npm commands.
+
+npm install
+
+And build it will below command:
+
+npm run dev
+
+Step 7: Create controllers
+
+We are going to build CRD part for users, roles and posts table, so we need resource controllers for them. Run below commands one by one to create controllers for them.
+
+php artisan make:controller UserController --resource
+php artisan make:controller RoleController --resource
+php artisan make:controller PermissionController --resource
+php artisan make:controller PostController --resource
+
+Now one by one controller, we will edit controllers and add CRUD feature in it. So open the controllers them one by one:
+
+app/Http/Controllers/UserController.php
+
+<?php
+
+namespace App\Http\Controllers;
+
+use DB;
+use Hash;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Spatie\Permission\Models\Role;
+
+class UserController extends Controller
+{
+    /**
+     * create a new instance of the class
+     *
+     * @return void
+     */
+    function __construct()
+    {
+         $this->middleware('permission:user-list|user-create|user-edit|user-delete', ['only' => ['index','store']]);
+         $this->middleware('permission:user-create', ['only' => ['create','store']]);
+         $this->middleware('permission:user-edit', ['only' => ['edit','update']]);
+         $this->middleware('permission:user-delete', ['only' => ['destroy']]);
+    }
+
+    /**
+     * Display a listing of the resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function index(Request $request)
+    {
+        $data = User::orderBy('id', 'desc')->paginate(5);
+
+        return view('users.index', compact('data'));
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function create()
+    {
+        $roles = Role::pluck('name','name')->all();
+
+        return view('users.create', compact('roles'));
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+        $this->validate($request, [
+            'name' => 'required',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|confirmed',
+            'roles' => 'required'
+        ]);
+
+        $input = $request->all();
+        $input['password'] = Hash::make($input['password']);
+
+        $user = User::create($input);
+        $user->assignRole($request->input('roles'));
+
+        return redirect()->route('users.index')
+            ->with('success', 'User created successfully.');
+    }
+
+    /**
+     * Display the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function show($id)
+    {
+        $user = User::find($id);
+
+        return view('users.show', compact('user'));
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function edit($id)
+    {
+        $user = User::find($id);
+        $roles = Role::pluck('name', 'name')->all();
+        $userRole = $user->roles->pluck('name', 'name')->all();
+
+        return view('users.edit', compact('user', 'roles', 'userRole'));
+    }
+
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request, $id)
+    {
+        $this->validate($request, [
+            'name' => 'required',
+            'email' => 'required|email|unique:users,email,'.$id,
+            'password' => 'confirmed',
+            'roles' => 'required'
+        ]);
+
+        $input = $request->all();
+
+        if(!empty($input['password'])) {
+            $input['password'] = Hash::make($input['password']);
+        } else {
+            $input = Arr::except($input, array('password'));
+        }
+
+        $user = User::find($id);
+        $user->update($input);
+
+        DB::table('model_has_roles')
+            ->where('model_id', $id)
+            ->delete();
+
+        $user->assignRole($request->input('roles'));
+
+        return redirect()->route('users.index')
+            ->with('success', 'User updated successfully.');
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy($id)
+    {
+        User::find($id)->delete();
+
+        return redirect()->route('users.index')
+            ->with('success', 'User deleted successfully.');
+    }
+}
+
+app/Http/Controllers/RoleController.php
+
+<?php
+
+namespace App\Http\Controllers;
+
+use DB;
+use Illuminate\Http\Request;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
+
+class RoleController extends Controller
+{
+    /**
+     * create a new instance of the class
+     *
+     * @return void
+     */
+    function __construct()
+    {
+         $this->middleware('permission:role-list|role-create|role-edit|role-delete', ['only' => ['index','store']]);
+         $this->middleware('permission:role-create', ['only' => ['create','store']]);
+         $this->middleware('permission:role-edit', ['only' => ['edit','update']]);
+         $this->middleware('permission:role-delete', ['only' => ['destroy']]);
+    }
+
+    /**
+     * Display a listing of the resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function index(Request $request)
+    {
+        $data = Role::orderBy('id','DESC')->paginate(5);
+
+        return view('roles.index', compact('data'));
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function create()
+    {
+        $permission = Permission::get();
+
+        return view('roles.create', compact('permission'));
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+        $this->validate($request, [
+            'name' => 'required|unique:roles,name',
+            'permission' => 'required',
+        ]);
+
+        $role = Role::create(['name' => $request->input('name')]);
+        $role->syncPermissions($request->input('permission'));
+
+        return redirect()->route('roles.index')
+            ->with('success', 'Role created successfully.');
+    }
+
+    /**
+     * Display the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function show($id)
+    {
+        $role = Role::find($id);
+        $rolePermissions = Permission::join('role_has_permissions', 'role_has_permissions.permission_id', 'permissions.id')
+            ->where('role_has_permissions.role_id',$id)
+            ->get();
+
+        return view('roles.show', compact('role', 'rolePermissions'));
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function edit($id)
+    {
+        $role = Role::find($id);
+        $permission = Permission::get();
+        $rolePermissions = DB::table('role_has_permissions')
+            ->where('role_has_permissions.role_id', $id)
+            ->pluck('role_has_permissions.permission_id', 'role_has_permissions.permission_id')
+            ->all();
+
+        return view('roles.edit', compact('role', 'permission', 'rolePermissions'));
+    }
+
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request, $id)
+    {
+        $this->validate($request, [
+            'name' => 'required',
+            'permission' => 'required',
+        ]);
+
+        $role = Role::find($id);
+        $role->name = $request->input('name');
+        $role->save();
+
+        $role->syncPermissions($request->input('permission'));
+
+        return redirect()->route('roles.index')
+            ->with('success', 'Role updated successfully.');
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy($id)
+    {
+        Role::find($id)->delete();
+
+        return redirect()->route('roles.index')
+            ->with('success', 'Role deleted successfully');
+    }
+}
+
+app/Http/Controllers/PermissionController.php
+
+<?php
+
+namespace App\Http\Controllers;
+
+use DB;
+use Illuminate\Http\Request;
+use Spatie\Permission\Models\Permission;
+
+class PermissionController extends Controller
+{
+    /**
+     * create a new instance of the class
+     *
+     * @return void
+     */
+    function __construct()
+    {
+         $this->middleware('permission:permission-list|permission-create|permission-edit|permission-delete', ['only' => ['index','store']]);
+         $this->middleware('permission:permission-create', ['only' => ['create','store']]);
+         $this->middleware('permission:permission-edit', ['only' => ['edit','update']]);
+         $this->middleware('permission:permission-delete', ['only' => ['destroy']]);
+    }
+
+    /**
+     * Display a listing of the resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function index(Request $request)
+    {
+        $data = Permission::orderBy('id','DESC')->paginate(5);
+
+        return view('permissions.index', compact('data'));
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function create()
+    {
+        return view('permissions.create');
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+        $this->validate($request, [
+            'name' => 'required|unique:permissions,name',
+        ]);
+
+        Permission::create(['name' => $request->input('name')]);
+
+        return redirect()->route('permissions.index')
+            ->with('success', 'Permission created successfully.');
+    }
+
+    /**
+     * Display the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function show($id)
+    {
+        $permission = Permission::find($id);
+
+        return view('permissions.show', compact('permission'));
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function edit($id)
+    {
+        $permission = Permission::find($id);
+
+        return view('permissions.edit', compact('permission'));
+    }
+
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request, $id)
+    {
+        $this->validate($request, [
+            'name' => 'required'
+        ]);
+
+        $permission = Permission::find($id);
+        $permission->name = $request->input('name');
+        $permission->save();
+
+        return redirect()->route('permissions.index')
+            ->with('success', 'Permission updated successfully.');
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy($id)
+    {
+        Permission::find($id)->delete();
+
+        return redirect()->route('permissions.index')
+            ->with('success', 'Permission deleted successfully');
+    }
+}
+
+app/Http/Controllers/PostController.php
+
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Post;
+use Illuminate\Http\Request;
+
+class PostController extends Controller
+{
+    /**
+     * create a new instance of the class
+     *
+     * @return void
+     */
+    function __construct()
+    {
+         $this->middleware('permission:post-list|post-create|post-edit|post-delete', ['only' => ['index', 'show']]);
+         $this->middleware('permission:post-create', ['only' => ['create', 'store']]);
+         $this->middleware('permission:post-edit', ['only' => ['edit', 'update']]);
+         $this->middleware('permission:post-delete', ['only' => ['destroy']]);
+    }
+
+    /**
+     * Display a listing of the resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function index(Request $request)
+    {
+        $data = Post::latest()->paginate(5);
+
+        return view('posts.index',compact('data'));
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function create()
+    {
+        return view('posts.create');
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(Request $request)
+    {
+        $this->validate($request, [
+            'title' => 'required',
+            'body' => 'required',
+        ]);
+        $input = $request->except(['_token']);
+
+        Post::create($input);
+
+        return redirect()->route('posts.index')
+            ->with('success','Post created successfully.');
+    }
+
+    /**
+     * Display the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function show($id)
+    {
+        $post = Post::find($id);
+
+        return view('posts.show', compact('post'));
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function edit($id)
+    {
+        $post = Post::find($id);
+
+        return view('posts.edit',compact('post'));
+    }
+
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request, $id)
+    {
+        $this->validate($request, [
+            'title' => 'required',
+            'body' => 'required',
+        ]);
+
+        $post = Post::find($id);
+
+        $post->update($request->all());
+
+        return redirect()->route('posts.index')
+            ->with('success', 'Post updated successfully.');
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy($id)
+    {
+        Post::find($id)->delete();
+
+        return redirect()->route('posts.index')
+            ->with('success', 'Post deleted successfully.');
+    }
+}
+
+Step 8: Create routes
+
+We have created all controllers. Now we create routes for them, open routes/web.php and add new routes in it.
+
+<?php
+
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\PostController;
+
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register web routes for your application. These
+| routes are loaded by the RouteServiceProvider within a group which
+| contains the "web" middleware group. Now create something great!
+|
+*/
+
+Route::get('/', function () {
+    return view('welcome');
+});
+
+Auth::routes();
+
+Route::get('/home', [HomeController::class, 'index'])->name('home');
+
+Route::group(['middleware' => ['auth']], function() {
+    Route::resource('users', UserController::class);
+    Route::resource('roles', RoleController::class);
+    Route::resource('permissions', PermissionController::class);
+    Route::resource('posts', PostController::class);
+});
